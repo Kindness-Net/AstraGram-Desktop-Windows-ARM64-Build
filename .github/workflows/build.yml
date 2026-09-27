@@ -131,6 +131,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ env.AYUGRAM_VCVARS_ARCH }}
+          toolset: ${{ env.AYUGRAM_TOOLSET_VERSION }}
 
       # 每个架构独占一个仓库，整体缓存各自享有完整的 10 GB 配额。
       - name: Restore libraries cache.
