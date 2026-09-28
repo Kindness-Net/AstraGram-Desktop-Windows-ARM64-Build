@@ -41,7 +41,7 @@ concurrency:
 jobs:
   windows:
     name: Windows ARM64
-    runs-on: windows-11-arm
+    runs-on: windows-11-vs2026-arm
     timeout-minutes: 359
 
     env:
@@ -49,9 +49,9 @@ jobs:
       BUILD_JOBS: '3'
       # 传给 scripts/build_support，按行指定目标平台与工具链
       AYUGRAM_TARGET: winarm64
-      AYUGRAM_TOOLSET_VERSION: '14.44'
-      AYUGRAM_CMAKE_TOOLSET: v143
-      AYUGRAM_CMAKE_GENERATOR: 'Visual Studio 17 2022'
+      AYUGRAM_TOOLSET_VERSION: '14.51'
+      AYUGRAM_CMAKE_TOOLSET: v145
+      AYUGRAM_CMAKE_GENERATOR: 'Visual Studio 18 2026'
       AYUGRAM_VCVARS_ARCH: arm64
       SHORT_WORKSPACE: 'C:\w'
       CACHE_KEY_PREFIX: win-libs-arm64-

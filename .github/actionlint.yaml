@@ -1,0 +1,4 @@
+# 补充 actionlint 尚未内置的官方托管镜像标签。
+self-hosted-runner:
+  labels:
+    - windows-11-vs2026-arm
