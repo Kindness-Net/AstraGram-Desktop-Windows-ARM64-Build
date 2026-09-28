@@ -31,7 +31,7 @@ on:
 
 permissions:
   contents: read
-  # 构建成功后清理同前缀的旧世代缓存
+  # 同分支同架构的缓存更新需要删除旧条目
   actions: write
 
 concurrency:
@@ -134,6 +134,15 @@ jobs:
           toolset: ${{ env.AYUGRAM_TOOLSET_VERSION }}
 
       # 每个架构独占一个仓库，整体缓存各自享有完整的 10 GB 配额。
+      - name: Check out cache maintenance scripts.
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: .builder-ci
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
       - name: Restore libraries cache.
         id: cache-libs
         uses: actions/cache/restore@v6
@@ -141,7 +150,7 @@ jobs:
           path: |
             ${{ env.SHORT_WORKSPACE }}\build\tmp\Libraries
             ${{ env.SHORT_WORKSPACE }}\build\tmp\ThirdParty
-          key: ${{ env.CACHE_KEY_PREFIX }}${{ hashFiles('scripts/prebuild.py', 'scripts/trim_windows_cache.py', 'scripts/build_support/recipes.py', 'scripts/build_support/recipes_arm64.py', 'scripts/build_support/dependency_cache.py') }}
+          key: ${{ env.CACHE_KEY_PREFIX }}${{ env.AYUGRAM_TOOLSET_VERSION }}-${{ env.AYUGRAM_CMAKE_TOOLSET }}-${{ hashFiles('scripts/prebuild.py', 'scripts/trim_windows_cache.py', 'scripts/build_support/*.py') }}
           restore-keys: ${{ env.CACHE_KEY_PREFIX }}
 
       # 缓存归档保不住符号链接，msys2 的 mtab 与 dev 由运行时重建
@@ -214,38 +223,28 @@ jobs:
         working-directory: ${{ env.SHORT_WORKSPACE }}
         run: python scripts/trim_windows_cache.py build/tmp/Libraries build/tmp/ThirdParty
 
-      # 只有 prebuild 和裁剪都成功才入库；后续应用编译失败不影响这份已验证缓存。
+      # 依赖和裁剪成功后先清旧缓存，再上传；应用失败不会丢失依赖成果。
+      - name: Prepare libraries cache update.
+        id: prepare-libs
+        if: steps.build-dependencies.outcome == 'success' && steps.trim-dependencies.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CACHE_PREFIX: ${{ env.CACHE_KEY_PREFIX }}
+          CURRENT_KEY: ${{ steps.cache-libs.outputs.cache-primary-key }}
+        run: |
+          python .builder-ci/.github/scripts/prepare_cache_save.py \
+            --prefix "$CACHE_PREFIX" --key "$CURRENT_KEY" \
+            "${{ env.SHORT_WORKSPACE }}/build/tmp/Libraries" "${{ env.SHORT_WORKSPACE }}/build/tmp/ThirdParty"
+
       - name: Save libraries cache.
-        id: save-libs
-        if: >-
-          steps.build-dependencies.outcome == 'success'
-            && steps.trim-dependencies.outcome == 'success'
-            && steps.cache-libs.outputs.cache-hit != 'true'
+        if: steps.prepare-libs.outputs.save == 'true'
         uses: actions/cache/save@v6
         with:
           path: |
             ${{ env.SHORT_WORKSPACE }}\build\tmp\Libraries
             ${{ env.SHORT_WORKSPACE }}\build\tmp\ThirdParty
           key: ${{ steps.cache-libs.outputs.cache-primary-key }}
-
-      # 仅在当前世代已安全入库（或精确命中）后清理同前缀旧世代，防止两代叠加挤爆配额
-      - name: Prune old cache generations.
-        if: >-
-          steps.cache-libs.outputs.cache-hit == 'true'
-            || steps.save-libs.outcome == 'success'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CURRENT_KEY: ${{ steps.cache-libs.outputs.cache-primary-key }}
-        run: |
-          set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
-            --jq '.actions_caches[] | select(.key | startswith(env.CACHE_KEY_PREFIX)) | select(.key != env.CURRENT_KEY) | .id' \
-            | while read -r id; do
-                test -z "$id" && continue
-                echo "deleting stale cache id $id"
-                gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/caches/$id" || true
-              done
 
       # build.py 读取 AYUGRAM_CCACHE 接入编译器；packer.cpp 自带 ccache:disable，私钥不进缓存
       - name: Install ccache.
@@ -259,7 +258,7 @@ jobs:
           echo "AYUGRAM_CCACHE=$(cygpath -w "$temp/$CCACHE_PACKAGE/ccache.exe")" >> "$GITHUB_ENV"
           echo "CCACHE_DIR=$(cygpath -w "$temp/ccache-data")" >> "$GITHUB_ENV"
 
-      # 放在依赖缓存之后恢复：依赖缓存换代时配额超限，先被淘汰的是编译缓存
+      # 依赖缓存换代完成后，恢复当前架构的应用编译缓存
       - name: Restore compiler cache.
         id: cache-ccache
         uses: actions/cache/restore@v6
@@ -297,24 +296,21 @@ jobs:
           case "$misses" in (*[!0-9]*|'') misses=0;; esac
           echo "misses=$misses" >> "$GITHUB_OUTPUT"
 
-      # 先删旧世代再入库，两代编译缓存叠加会把依赖缓存挤出配额
-      - name: Prune old compiler caches.
+      - name: Prepare compiler cache update.
+        id: prepare-ccache
         if: fromJSON(steps.ccache-stats.outputs.misses) > 300
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          CACHE_PREFIX: ${{ env.CCACHE_KEY_PREFIX }}
+          CURRENT_KEY: ${{ steps.cache-ccache.outputs.cache-primary-key }}
         run: |
-          set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
-            --jq '.actions_caches[] | select(.key | startswith(env.CCACHE_KEY_PREFIX)) | .id' \
-            | while read -r id; do
-                test -z "$id" && continue
-                echo "deleting stale compiler cache id $id"
-                gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/caches/$id" || true
-              done
+          python .builder-ci/.github/scripts/prepare_cache_save.py \
+            --prefix "$CACHE_PREFIX" --key "$CURRENT_KEY" \
+            "$CCACHE_DIR"
 
       - name: Save compiler cache.
-        if: fromJSON(steps.ccache-stats.outputs.misses) > 300
+        if: steps.prepare-ccache.outputs.save == 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ env.CCACHE_DIR }}
