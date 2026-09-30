@@ -80,7 +80,7 @@ jobs:
       - name: Check out repository.
         uses: actions/checkout@v7
         with:
-          repository: Kindness-Kismet/AyuGramDesktop-Plus
+          repository: Kindness-Kismet/AstraGram-Desktop
           ref: ${{ inputs.source_sha }}
           submodules: recursive
           fetch-depth: 1
@@ -104,7 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/build_provenance.py validate-source \
-            --repository Kindness-Kismet/AyuGramDesktop-Plus \
+            --repository Kindness-Kismet/AstraGram-Desktop \
             --sha "$SOURCE_SHA" \
             --ref "$SOURCE_REF" \
             --run-id "$SOURCE_RUN_ID" \
@@ -278,7 +278,7 @@ jobs:
           test -n "$PACKER_PRIVATE_H"
           printf '%s' "$PACKER_PRIVATE_H" > Telegram/SourceFiles/_other/packer_private.h
 
-      - name: Build AyuGram Desktop.
+      - name: Build AstraGram Desktop.
         shell: cmd
         working-directory: ${{ env.SHORT_WORKSPACE }}
         run: |
@@ -321,7 +321,7 @@ jobs:
         working-directory: ${{ env.SHORT_WORKSPACE }}
         run: |
           set -euo pipefail
-          artifact=$(ls build/AyuGram-v*-win-arm64.zip | head -1)
+          artifact=$(ls build/AstraGram-v*-win-arm64.zip | head -1)
           test -n "$artifact"
           size=$(stat -c %s "$artifact")
           echo "File size of ${artifact}: ${size} Bytes."
@@ -335,9 +335,9 @@ jobs:
           test -n "$version"
           packer=$(pwd)/build/tmp/out/Release/Packer.exe
           test -f "$packer"
-          cd build/AyuGram-v*-win-arm64-release
+          cd build/AstraGram-v*-win-arm64-release
           "$packer" -target winarm -version "$version" \
-            -path AyuGram.exe -path Updater.exe
+            -path AstraGram.exe -path Updater.exe
           mv "tarm64upd${version}" ../
           ls -l "../tarm64upd${version}"
 
@@ -353,12 +353,12 @@ jobs:
           APP_UPDATE_VERSION: ${{ inputs.appupdateversion }}
         run: |
           set -euo pipefail
-          archive=$(ls build/AyuGram-v*-win-arm64.zip)
+          archive=$(ls build/AstraGram-v*-win-arm64.zip)
           update="build/tarm64upd${APP_UPDATE_VERSION}"
           python scripts/build_provenance.py write-artifact-manifest \
             --platform windows \
             --arch arm64 \
-            --source-repository Kindness-Kismet/AyuGramDesktop-Plus \
+            --source-repository Kindness-Kismet/AstraGram-Desktop \
             --source-ref "$SOURCE_REF" \
             --source-sha "$SOURCE_SHA" \
             --source-run-id "$SOURCE_RUN_ID" \
@@ -375,9 +375,9 @@ jobs:
       - name: Upload artifact.
         uses: actions/upload-artifact@v7
         with:
-          name: AyuGram-Windows-arm64
+          name: AstraGram-Windows-arm64
           path: |
-            ${{ env.SHORT_WORKSPACE }}\build\AyuGram-v*-win-arm64.zip
+            ${{ env.SHORT_WORKSPACE }}\build\AstraGram-v*-win-arm64.zip
             ${{ env.SHORT_WORKSPACE }}\build\tarm64upd*
             ${{ env.SHORT_WORKSPACE }}\build\provenance-windows-arm64.json
           retention-days: 7
