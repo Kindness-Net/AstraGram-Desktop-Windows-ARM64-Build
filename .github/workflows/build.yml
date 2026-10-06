@@ -1,5 +1,5 @@
 name: Upstream validation
-run-name: "Upstream v7.2.10 validation · ecb55de8ca72dc2b145a5ff63c499a2ae5a413c0"
+run-name: "Upstream v7.2.10 validation · 49bf23492c6b32ff362c8af8dea677f4430f4624"
 
 on:
   workflow_dispatch:
@@ -56,7 +56,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: Kindness-Kismet/AstraGram-Desktop
-          ref: ecb55de8ca72dc2b145a5ff63c499a2ae5a413c0
+          ref: 49bf23492c6b32ff362c8af8dea677f4430f4624
           submodules: recursive
           fetch-depth: 1
           persist-credentials: false
@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_ACTOR" = "KiritoXDone"
-          test "$(git rev-parse HEAD)" = "ecb55de8ca72dc2b145a5ff63c499a2ae5a413c0"
+          test "$(git rev-parse HEAD)" = "49bf23492c6b32ff362c8af8dea677f4430f4624"
           git submodule status --recursive
 
       - name: Check packer cache guard.
@@ -290,7 +290,7 @@ jobs:
       - name: Upload artifact.
         uses: actions/upload-artifact@v7
         with:
-          name: Test-Upstream-7.2.10-ecb55de8ca-AstraGram-Windows-arm64
+          name: Test-Upstream-7.2.10-49bf23492c-AstraGram-Windows-arm64
           path: |
             ${{ env.SHORT_WORKSPACE }}\build\AstraGram-v*-win-arm64.zip
           retention-days: 7
