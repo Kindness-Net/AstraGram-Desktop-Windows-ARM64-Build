@@ -1,9 +1,14 @@
 name: Windows
-run-name: "Windows ARM64 · source run #${{ inputs.source_run_id }}.${{ inputs.source_run_attempt }} · ${{ inputs.source_sha }}"
+run-name: "${{ inputs.build_only && 'Windows ARM64 · manual build' || format('Windows ARM64 · source run #{0}.{1}', inputs.source_run_id, inputs.source_run_attempt) }} · ${{ inputs.source_sha }}"
 
 on:
   workflow_dispatch:
     inputs:
+      build_only:
+        description: Build a main-branch commit without release provenance.
+        required: false
+        default: false
+        type: boolean
       source_sha:
         description: Exact source commit SHA.
         required: true
@@ -14,11 +19,11 @@ on:
         type: string
       source_run_id:
         description: Source Release workflow run ID.
-        required: true
+        required: false
         type: string
       source_run_attempt:
         description: Source Release workflow run attempt.
-        required: true
+        required: false
         type: string
       version:
         description: Display version from the source commit.
@@ -35,7 +40,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.source_ref }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.source_ref }}-${{ inputs.build_only && 'build-only' || 'release' }}
   cancel-in-progress: true
 
 jobs:
@@ -92,6 +97,7 @@ jobs:
           python-version: '3.12'
 
       - name: Validate source request.
+        if: ${{ !inputs.build_only }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -112,6 +118,29 @@ jobs:
             --version "$VERSION" \
             --appupdateversion "$APP_UPDATE_VERSION" \
             --workflow-path .github/workflows/build-release.yml
+
+      - name: Validate standalone source.
+        if: ${{ inputs.build_only }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          VERSION: ${{ inputs.version }}
+          APP_UPDATE_VERSION: ${{ inputs.appupdateversion }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "KiritoXDone"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$SOURCE_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(awk '$1 == "AppVersionStrSmall" { print $2 }' Telegram/build/version)" = "$VERSION"
+          test "$(awk '$1 == "AppUpdateVersion" { print $2 }' Telegram/build/version)" = "$APP_UPDATE_VERSION"
+          status=$(gh api "repos/Kindness-Kismet/AstraGram-Desktop/compare/${SOURCE_SHA}...main" --jq '.status')
+          case "$status" in
+            identical|ahead) ;;
+            *) echo "Source SHA is not an ancestor of main: $status" >&2; exit 1 ;;
+          esac
 
       - name: Check packer cache guard.
         shell: bash
@@ -327,6 +356,7 @@ jobs:
           echo "File size of ${artifact}: ${size} Bytes."
 
       - name: Pack update.
+        if: ${{ !inputs.build_only }}
         shell: bash
         working-directory: ${{ env.SHORT_WORKSPACE }}
         run: |
@@ -342,6 +372,7 @@ jobs:
           ls -l "../tarm64upd${version}"
 
       - name: Write artifact provenance.
+        if: ${{ !inputs.build_only }}
         shell: bash
         working-directory: ${{ env.SHORT_WORKSPACE }}
         env:
@@ -375,7 +406,7 @@ jobs:
       - name: Upload artifact.
         uses: actions/upload-artifact@v7
         with:
-          name: AstraGram-Windows-arm64
+          name: ${{ inputs.build_only && format('Validation-{0}-AstraGram-Windows-arm64', inputs.source_sha) || 'AstraGram-Windows-arm64' }}
           path: |
             ${{ env.SHORT_WORKSPACE }}\build\AstraGram-v*-win-arm64.zip
             ${{ env.SHORT_WORKSPACE }}\build\tarm64upd*

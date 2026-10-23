@@ -7,3 +7,5 @@ The source repository dispatches an exact commit and Release workflow run. This 
 Pull requests only validate workflow syntax. The signing key is scoped to the dispatched build workflow and is removed from the runner workspace after each build.
 
 The source release currently treats the Windows ARM64 build as optional; a failed run does not block the source release.
+
+For a standalone rebuild, dispatch `build.yml` on `main` with `build_only=true`, an exact source SHA from the source repository's `main` history, `source_ref=refs/heads/main`, and the matching `version` and `appupdateversion` values. Leave the source Release run fields empty. Manual builds validate the checkout and main-branch ancestry, then upload `Validation-<SHA>-...` archives without update packages or release provenance; they do not update an existing release.
