@@ -109,7 +109,7 @@ jobs:
           APP_UPDATE_VERSION: ${{ inputs.appupdateversion }}
         run: |
           set -euo pipefail
-          python scripts/build_provenance.py validate-source \
+          python .github/scripts/build_provenance.py validate-source \
             --repository Kindness-Kismet/AstraGram-Desktop \
             --sha "$SOURCE_SHA" \
             --ref "$SOURCE_REF" \
@@ -150,6 +150,7 @@ jobs:
 
       # subst 会被 Python 和 Qt 还原成长路径，复制到物理短目录后再编译。
       - name: Create short build workspace.
+        id: workspace
         shell: cmd
         run: |
           robocopy "%GITHUB_WORKSPACE%" "%SHORT_WORKSPACE%" /MIR /XD "%GITHUB_WORKSPACE%\.git" /R:2 /W:1
@@ -179,7 +180,7 @@ jobs:
           path: |
             ${{ env.SHORT_WORKSPACE }}\build\tmp\Libraries
             ${{ env.SHORT_WORKSPACE }}\build\tmp\ThirdParty
-          key: ${{ env.CACHE_KEY_PREFIX }}${{ env.AYUGRAM_TOOLSET_VERSION }}-${{ env.AYUGRAM_CMAKE_TOOLSET }}-${{ hashFiles('scripts/prebuild.py', 'scripts/trim_windows_cache.py', 'scripts/build_support/*.py') }}
+          key: ${{ env.CACHE_KEY_PREFIX }}${{ env.AYUGRAM_TOOLSET_VERSION }}-${{ env.AYUGRAM_CMAKE_TOOLSET }}-${{ hashFiles('scripts/prebuild.py', '.github/scripts/trim_windows_cache.py', 'scripts/build_support/*.py') }}
           restore-keys: ${{ env.CACHE_KEY_PREFIX }}
 
       # 缓存归档保不住符号链接，msys2 的 mtab 与 dev 由运行时重建
@@ -250,7 +251,7 @@ jobs:
         id: trim-dependencies
         shell: cmd
         working-directory: ${{ env.SHORT_WORKSPACE }}
-        run: python scripts/trim_windows_cache.py build/tmp/Libraries build/tmp/ThirdParty
+        run: python .github/scripts/trim_windows_cache.py build/tmp/Libraries build/tmp/ThirdParty
 
       # 依赖和裁剪成功后先清旧缓存，再上传；应用失败不会丢失依赖成果。
       - name: Prepare libraries cache update.
@@ -386,7 +387,7 @@ jobs:
           set -euo pipefail
           archive=$(ls build/AstraGram-v*-win-arm64.zip)
           update="build/tarm64upd${APP_UPDATE_VERSION}"
-          python scripts/build_provenance.py write-artifact-manifest \
+          python .github/scripts/build_provenance.py write-artifact-manifest \
             --platform windows \
             --arch arm64 \
             --source-repository Kindness-Kismet/AstraGram-Desktop \
@@ -414,7 +415,7 @@ jobs:
           retention-days: 7
 
       - name: Remove packer signing key.
-        if: always()
+        if: always() && steps.workspace.outcome == 'success'
         shell: bash
         working-directory: ${{ env.SHORT_WORKSPACE }}
         run: rm -f Telegram/SourceFiles/_other/packer_private.h
