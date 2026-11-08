@@ -63,7 +63,7 @@ jobs:
       # 发布包哈希与 GitHub 发布页的 digest 一致，升级版本时两项一起改
       CCACHE_PACKAGE: ccache-4.14-windows-aarch64
       CCACHE_SHA256: baa07085f68f75ea033d6f8d8fe6b53b7f353050bd191e299ff27e131cc3d787
-      CCACHE_URL: https://github.com/ccache/ccache/releases/download/v4.14
+      CCACHE_TAG: v4.14
       # 与依赖缓存共用仓库 10 GB 配额，两者合计须留有余量
       CCACHE_MAXSIZE: 4G
       CCACHE_KEY_PREFIX: win-ccache-arm64-
@@ -279,10 +279,13 @@ jobs:
       # build.py 读取 AYUGRAM_CCACHE 接入编译器；packer.cpp 自带 ccache:disable，私钥不进缓存
       - name: Install ccache.
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           temp=$(cygpath -u "$RUNNER_TEMP")
-          curl -fsSLo "$temp/ccache.zip" "$CCACHE_URL/$CCACHE_PACKAGE.zip"
+          gh release download "$CCACHE_TAG" --repo ccache/ccache \
+            --pattern "$CCACHE_PACKAGE.zip" --output "$temp/ccache.zip"
           echo "$CCACHE_SHA256  $temp/ccache.zip" | sha256sum -c -
           python -m zipfile -e "$temp/ccache.zip" "$temp"
           echo "AYUGRAM_CCACHE=$(cygpath -w "$temp/$CCACHE_PACKAGE/ccache.exe")" >> "$GITHUB_ENV"
