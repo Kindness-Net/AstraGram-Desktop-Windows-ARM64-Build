@@ -54,7 +54,8 @@ jobs:
       BUILD_JOBS: '3'
       # 传给 scripts/build_support，按行指定目标平台与工具链
       AYUGRAM_TARGET: winarm64
-      AYUGRAM_TOOLSET_VERSION: '14.51'
+      # ARM64 镜像已移除 14.51；14.52.37025 起修复了 FFmpeg 编译错误。
+      AYUGRAM_TOOLSET_VERSION: '14.52'
       AYUGRAM_CMAKE_TOOLSET: v145
       AYUGRAM_CMAKE_GENERATOR: 'Visual Studio 18 2026'
       AYUGRAM_VCVARS_ARCH: arm64
