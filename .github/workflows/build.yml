@@ -372,7 +372,8 @@ jobs:
           test -f "$packer"
           cd build/AstraGram-v*-win-arm64-release
           "$packer" -target winarm -version "$version" \
-            -path AstraGram.exe -path Updater.exe
+            -path AstraGram.exe -path Updater.exe \
+            -path modules/arm64/TelegramWidgetHelper.exe
           mv "tarm64upd${version}" ../
           ls -l "../tarm64upd${version}"
 
